@@ -1,22 +1,35 @@
-
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
-from sklearn.metrics import accuracy_score
 import joblib
 import os
 
 # Load dataset
 df = pd.read_csv("data/tourism.csv")
 
-# Basic preprocessing
-df = df.fillna(method="ffill")
+print("Columns in dataset:", df.columns.tolist())
 
-X = df.drop(["CustomerID", "ProdTaken"], axis=1)
-y = df["ProdTaken"]
+# Forward fill missing values
+df = df.ffill()
 
-# Simple encoding for safety
+# Automatically detect target column
+if "ProdTaken" in df.columns:
+    target_col = "ProdTaken"
+elif "prod_taken" in df.columns:
+    target_col = "prod_taken"
+else:
+    raise Exception("Target column not found in dataset")
+
+# Remove ID column safely if present
+if "CustomerID" in df.columns:
+    df = df.drop("CustomerID", axis=1)
+if "customer_id" in df.columns:
+    df = df.drop("customer_id", axis=1)
+
+X = df.drop(target_col, axis=1)
+y = df[target_col]
+
+# Encode categorical variables
 X = pd.get_dummies(X)
 
 # Train test split
@@ -25,7 +38,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 # Train model
-model = XGBClassifier(use_label_encoder=False, eval_metric="logloss")
+model = XGBClassifier(eval_metric="logloss")
 model.fit(X_train, y_train)
 
 # Save model
