@@ -1,45 +1,53 @@
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
-import joblib
 import os
+import joblib
+import pandas as pd
+
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from xgboost import XGBClassifier
+
 
 # Load dataset
 df = pd.read_csv("data/tourism.csv")
 
-print("Columns in dataset:", df.columns.tolist())
+# Fill missing values
+df = df.ffill().bfill()
 
-# Forward fill missing values
-df = df.ffill()
+# 🔥 Use LAST column as target (most ML datasets follow this)
+target_col = df.columns[-1]
 
-# Automatically detect target column
-if "ProdTaken" in df.columns:
-    target_col = "ProdTaken"
-elif "prod_taken" in df.columns:
-    target_col = "prod_taken"
-else:
-    raise Exception("Target column not found in dataset")
-
-# Remove ID column safely if present
-if "CustomerID" in df.columns:
-    df = df.drop("CustomerID", axis=1)
-if "customer_id" in df.columns:
-    df = df.drop("customer_id", axis=1)
-
-X = df.drop(target_col, axis=1)
 y = df[target_col]
+X = df.drop(columns=[target_col])
 
-# Encode categorical variables
+# Remove obvious ID columns if present
+for col in X.columns:
+    if "id" in col.lower():
+        X = X.drop(columns=[col])
+
+# One-hot encode categorical variables
 X = pd.get_dummies(X)
 
-# Train test split
+# Train/test split
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
 # Train model
-model = XGBClassifier(eval_metric="logloss")
+model = XGBClassifier(
+    n_estimators=200,
+    max_depth=6,
+    learning_rate=0.05,
+    random_state=42,
+    eval_metric="logloss",
+    use_label_encoder=False
+)
+
 model.fit(X_train, y_train)
+
+# Evaluate
+preds = model.predict(X_test)
+acc = accuracy_score(y_test, preds)
+print("Accuracy:", acc)
 
 # Save model
 os.makedirs("model", exist_ok=True)
